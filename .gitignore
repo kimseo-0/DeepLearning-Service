@@ -8,3 +8,7 @@ wheels/
 
 # Virtual environments
 .venv
+/src/fastApi_YOLO_server/images
+/src/fastApi_YOLO_server/models
+/src/fastApi_YOLO_server/results
+/src/fastApi_celebrityImage_classification_server/models
