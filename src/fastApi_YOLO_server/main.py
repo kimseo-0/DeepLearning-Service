@@ -12,37 +12,37 @@ import base64
 # --- Utills ---
 ############################
 
+# 타임스탬프, UUID, 확장자를 결합하여 고유한 파일명을 만듭니다.
 def create_unique_imagename(file):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     unique_id = uuid.uuid4().hex
 
     file_extension = file.filename.split('.')[-1]
-
-    # 타임스탬프, UUID, 확장자를 결합하여 고유한 파일명을 만듭니다.
     unique_filename = f"{timestamp}_{unique_id}.{file_extension}"
     return unique_filename
 
 ############################
 ############################
 
+# fast api 준비
+app = FastAPI(title="YOLO")
 
 ############################
 # Model
 ############################
 
-# 모델 준비
-model = YOLO("C:\Potenup\DeepLearning-Service\src\\fastApi_YOLO_server\models\yolo11n.pt")
+@app.on_event("startup")
+async def startup_event():
+    print("service is started.")
+    # 모델 준비
+    model = YOLO("C:\Potenup\DeepLearning-Service\src\\fastApi_YOLO_server\models\yolo11n.pt")
 
 ############################
 ############################
 
-
 ############################
-# FAST API
+# API
 ############################
-
-# fast api 준비
-app = FastAPI(title="ResNet34")
 
 class YOLOResponse(BaseModel):
     name : list
@@ -63,13 +63,13 @@ async def chat(msg : str):
 
 # 예측 Api
 @app.post("/yolo", response_model=YOLOResponse)
-async def yoloPredict(file : UploadFile=File(...)): # 요청할 때 키값을 반드시 붙여서 보내야함!
+async def yolo(file : UploadFile=File(...)): # 요청할 때 키값을 반드시 붙여서 보내야함!
     try:
         # 이미지 처리
         contents = await file.read()
         image = Image.open(io.BytesIO(contents))
 
-        # filename = create_unique_imagename(file) # uuid, count, timestamp 파일명 생성
+        filename = create_unique_imagename(file) # uuid, count, timestamp 파일명 생성
         filename = file.filename
         save_path = f'./images/{filename}'
         image.save(save_path)
@@ -80,26 +80,31 @@ async def yoloPredict(file : UploadFile=File(...)): # 요청할 때 키값을 �
     # 이미지들의 경로를 리스트로 작성
     results = model.predict(save_path)
 
-    if not results or not results[0].boxes.data.shape[0]:
-        # 감지된 객체가 없을 경우 에러를 반환합니다.
+    result = results[0]
+    # for result in results:
+    if not results or not result.boxes.data.shape[0]:
         raise HTTPException(status_code=404, detail="감지된 객체가 없습니다.")
 
     result_image_path = f'./results/{filename}'
-    results[0].save(result_image_path)
+    result.save(result_image_path)
     
     # 저장된 결과 이미지를 Base64 문자열로 인코딩합니다.
     with open(result_image_path, "rb") as image_file:
         encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
     
     # 분류할 클래스 리스트
-    class_names = results[0].names
-    x1, y1, x2, y2, conf, cls = results[0].boxes.data[0]
+    class_names = result.names # {0 : 'person', 1: 'bycicle', ....}
 
-    result_classname = [class_names[cls] for cls in results[0].boxes.cls.tolist()]
-    result_score = [conf * 100 for conf in results[0].boxes.conf.tolist()]
+    result_classname = [] # ['person', 'bycicle', 'person'...]
+    result_score = [] # [50.5 , 95.8 ...]
 
-    # 분류할 클래스 리스트
-    print(f"name : {class_names[cls.item()]}")
+    for box in result.boxes:
+        class_id = box.cls.item()
+        result_classname.append(class_names[class_id])
+        result_score.append(box.conf.item() * 100)
+
+    # result_classname = [class_names[cls] for cls in results[0].boxes.cls.tolist()]
+    # result_score = [conf * 100 for conf in results[0].boxes.conf.tolist()]
 
     return YOLOResponse(name = result_classname, score = result_score, resultImage = encoded_string)
 

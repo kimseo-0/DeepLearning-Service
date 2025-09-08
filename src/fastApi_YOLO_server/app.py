@@ -5,13 +5,9 @@ import base64
 import pandas as pd
 
 # FastAPI 서버의 /chat 엔드포인트 URL
-base_url = "http://172.30.1.44:8080"
+base_url = "http://172.16.20.199:8080"
 chat_api_url = base_url + "/chat"
 yolo_api_url = base_url + "/yolo"
-
-############################
-# Streamlit
-############################
 
 st.title("API 활용 간단 앱")
 st.write("FastAPI 서버와 통신하는 간단한 스트림릿 앱입니다.")
@@ -55,16 +51,14 @@ if uploaded_file is not None:
     st.image(uploaded_file, caption="업로드된 이미지", use_container_width=True)
     
     if st.button("YOLO 예측 시작"):        
-        # multipart/form-data 형식으로 이미지 파일을 보냅니다.
         files = {"file": uploaded_file}
 
         with st.spinner('예측 중...'):
             try:
                 response = requests.post(yolo_api_url, files=files)
-                response.raise_for_status() # HTTP 오류가 발생하면 예외를 발생시킵니다.
+                response.raise_for_status() # HTTP 오류가 발생 시 예외처리
                 yolo_response = response.json()
                 
-                # 예측 결과를 화면에 표시합니다.
                 st.success("예측 완료!")
                 
                 st.write("### 예측 결과")
@@ -74,6 +68,7 @@ if uploaded_file is not None:
                     image_data = base64.b64decode(yolo_response['resultImage'])
                     st.image(image_data, caption="결과 이미지", use_container_width=True)
                 
+                # 결과 테이블
                 df = pd.DataFrame({
                     "예측명": yolo_response.get('name', []),
                     "예측 신뢰도": yolo_response.get('score', [])
